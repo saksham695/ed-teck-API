@@ -8,6 +8,9 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
 
+from app.dummy_data import DUMMY_COURSES, DUMMY_ENROLLMENTS, DUMMY_USERS
+from app.seed_loader import build_courses, build_enrollments, build_users, calculate_next_ids
+
 
 app = FastAPI(title="LearnHub API", version="1.0.0")
 
@@ -163,13 +166,30 @@ class Store:
         self._seed()
 
     def _seed(self) -> None:
-        seeded = [
-            User(id=1, name="Admin User", email="admin@learnhub.com", password="admin123", role=Role.admin),
-            User(id=2, name="Priya Mentor", email="priya@learnhub.com", password="mentor123", role=Role.mentor),
-            User(id=3, name="Arjun Mentee", email="arjun@learnhub.com", password="mentee123", role=Role.mentee),
-        ]
-        for user in seeded:
-            self.users[user.id] = user
+        self.users = build_users(DUMMY_USERS, user_model=User, role_enum=Role)
+
+        self.courses = build_courses(
+            DUMMY_COURSES,
+            course_model=Course,
+            module_model=Module,
+            lecture_model=Lecture,
+            assignment_model=Assignment,
+            question_model=MCQQuestion,
+            option_model=MCQOption,
+            difficulty_enum=Difficulty,
+            status_enum=CourseStatus,
+        )
+
+        self.enrollments, self.progress = build_enrollments(
+            DUMMY_ENROLLMENTS,
+            enrollment_model=Enrollment,
+            progress_model=Progress,
+        )
+
+        self._next_ids.update(
+            calculate_next_ids(courses=self.courses.values(), enrollments=self.enrollments.values())
+        )
+
 
     def next_id(self, key: str) -> int:
         current = self._next_ids[key]
